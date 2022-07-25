@@ -3,7 +3,8 @@
 # This script will take a program ID and find all accounts that implement it.
 
 echo "Enter the RPC node you would like to utilize, press enter to use default:"
-read  RPC_NODE
+#read  RPC_NODE
+RPC_NODE=""
 echo "Enter a Solana program ID:"
 read  PROGRAM_ID
 
