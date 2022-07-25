@@ -1,0 +1,24 @@
+{
+  "price": 0.169,
+  "number": null,
+  "gatekeeper": null,
+  "solTreasuryAccount": null,
+  "splTokenAccount": null,
+  "splToken": null,
+  "goLiveDate": 1660155323000,
+  "endSettings": null,
+  "whitelistMintSettings": {
+  "mode": {"burnEveryTime": true},
+  "mint": "9BctNh2jMp9ygbdyHoLGgZsQVjPynBnKZ4fkHDZ8vwwS",
+  "presale": false,
+  "discountPrice": 0
+  },
+  "hiddenSettings": null,
+  "storage": "ipfs",
+  "ipfsInfuraProjectId": "20OLKIgTEcdfuejz1CNvKUwm3BT",
+  "ipfsInfuraSecret": "f80730b94b685d570be5d5acca389817",
+  "awsS3Bucket": null,
+  "nftStorageKey": null,
+  "noRetainAuthority": false,
+  "noMutable": false
+}
