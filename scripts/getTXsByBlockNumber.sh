@@ -4,6 +4,9 @@
 # storing transactions in json form, gzip compressed in the 
 # ../transactions/ folder.
 #
+# "but azoth, if they're all compressed how to do i work with them?????"
+# "$man zcat"
+
 echo "would you like to configure settings? (y/n)"
 read CONFIGURE
 
