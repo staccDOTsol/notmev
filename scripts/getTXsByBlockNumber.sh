@@ -8,13 +8,13 @@
 # "$man zcat"
 
 echo "would you like to configure settings? (y/n)"
-read CONFIGURE
-
+#read CONFIGURE
+CONFIGURE=n
 if [[ "$CONFIGURE" == "y" ]]; then
   echo "Enter the RPC node you would like to utilize, press enter to use default:"
   read  RPC_NODE
   echo "Enter a block number to iterate backwards from, press enter to use the last block:"
-  read  CURRENT_BLOCK_NUMBER
+  read  BLOCK_NUMBER
   echo "Enter a block to stop at, press enter to use the hard coded default:"
   read  END_BLOCK_NUMBER
 
@@ -25,30 +25,35 @@ if [[ "$CONFIGURE" == "y" ]]; then
   fi
 elif [[ "$CONFIGURE" == "n" ]]; then
 # TODO: get current block number
-  CURRENT_BLOCK_NUMBER=143019040
-  END_BLOCK_NUMBER=$((BLOCK_NUMBER - 50))
+  BLOCK_NUMBER=143019040
+  END_BLOCK_NUMBER=`expr $BLOCK_NUMBER - 150`
   RPC_NODE="https://solana--mainnet.datahub.figment.io/apikey/24c64e276fc5db6ff73da2f59bac40f2"
-else
-  echo "unexpected input, exitting..."
-  exit
+# else
+#  echo "unexpected input, exitting..."
+#  exit
 fi
-
+echo $BLOCK_NUMBER
+echo $END_BLOCK_NUMBER
 # Iterate from $BLOCK_NUMBER backwards to END_BLOCK_NUMBER
 
 while [[ $BLOCK_NUMBER -gt $END_BLOCK_NUMBER ]]
   do
-    UNZIPPED_FILE="../transactions/$BLOCK_NUMBER.json"
-    ZIPPED_FILE="../transactions/$BLOCK_NUMBER.json.gz"
+    
+    UNZIPPED_FILE="../transactions/"$BLOCK_NUMBER".json"
+    ZIPPED_FILE="../transactions/"$BLOCK_NUMBER".json.gz"
 
-    if test -f "$UNZIPPED_FILE"; then
-        echo "$UNZIPPED_FILE exists, compressing with gzip and skipping this block."
-        gzip $UNZIPPED_FILE
-        CURRENT_BLOCK_NUMBER=`expr $BLOCK_NUMBER - 1`
+    #if test -f "$UNZIPPED_FILE"; then
+        #echo "$UNZIPPED_FILE exists, compressing with gzip and skipping this block."
+        #gzip $UNZIPPED_FILE
+        #BLOCK_NUMBER=`expr $BLOCK_NUMBER - 1`
+       # continue
+    if test -f "$ZIPPED_FILE"; then
+        echo $ZIPPED_FILE "exists, skipping this block."
+        BLOCK_NUMBER=`expr $BLOCK_NUMBER - 1`
+        echo $BLOCK_NUMBER
         continue
-    elif test -f "$ZIPPED_FILE"; then
-        echo "$ZIPPED_FILE exists, skipping this block."
-        CURRENT_BLOCK_NUMBER=`expr $BLOCK_NUMBER - 1`
-        continue
+    else 
+      touch $UNZIPPED_FILE
     fi
 
     # If the  pass and the block hasn't been analyzed yet:
@@ -66,8 +71,8 @@ while [[ $BLOCK_NUMBER -gt $END_BLOCK_NUMBER ]]
       gzip $UNZIPPED_FILE
 
       # iterate block number
-      CURRENT_BLOCK_NUMBER=`expr $BLOCK_NUMBER - 1`
+      BLOCK_NUMBER=`expr $BLOCK_NUMBER - 1`
 
-      # sleep to avoid rate limiting
-      sleep 1
+      # sleep to avoid rate limiting #lol
+      #sleep 0
 done

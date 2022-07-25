@@ -8,7 +8,7 @@ echo "Enter a Solana program ID:"
 read  PROGRAM_ID
 
 if [$RPC_NODE == ""]; then
-    RPC_NODE="https://solana--mainnet.datahub.figment.io/apikey/24c64e276fc5db6ff73da2f59bac40f2"
+    RPC_NODE="https://rpc.theindex.io/mainnet-beta/4ae962ec-5c8c-4071-9ef2-e5c6b59bdf3e"
 fi
 
 if [$PROGRAM_ID == ""]; then
