@@ -982,9 +982,12 @@ export class Blockchain {
       })
       // @ts-ignore
       .process(async market => {
+        opps[market].liqtopbbos = 0
         try {
            let maybeusd = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+           if (market.split('/')[0] == "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" ){
             for (var abc in baseQuotes[market]) {
+
               let market2 = await Market.load(
                 this.connection,
                 new PublicKey(baseQuotes[market][abc].market),
@@ -997,22 +1000,31 @@ export class Blockchain {
               let asks = await market2.loadAsks(this.connection);
 
               // bids
-
-              for (let [price, size] of bids.getL2(1)) {
+              let bsize = 0
+              for (let [price, size] of bids.getL2(3)) {
+                bsize += size / 10 ** 6
                 if (price > opps[market].bb) {
                   opps[market].bb = price;
                   opps[market].quotem = baseQuotes[market][abc].market;
                   opps[market].quotep = baseQuotes[market][abc].proxy;
                 }
               }
-
-              for (let [price, size] of asks.getL2(1)) {
+              let asize = 0
+              for (let [price, size] of asks.getL2(3)) {
+                asize += size / 10 ** 6
                 if (price < opps[market].ba) {
                   opps[market].ba = price;
                   opps[market].basem = baseQuotes[market][abc].market;
                   opps[market].basep = baseQuotes[market][abc].proxy;
                 }
               }
+              
+              opps[market].liqtopbbos+=   asize + bsize 
+
+            }
+            
+
+            /*
               let s1 = (opps[market].bb / opps[market].ba - 1) * 100;
               let usdc = maybeusd + '/' + market.split('/')[0];
               let s2 = (opps[usdc].ba * opps[usdc].bb - 1) * 100;
@@ -1056,6 +1068,7 @@ export class Blockchain {
                   profit_potential: s5, //decimalslol,
                   trades: ['BID', 'ASK', 'BID', 'ASK'],
                 };
+                
                let hm = await   doTrade(athing)
                       
   let ahh =  await sendTransaction(hm.connection, hm.tx, [
@@ -1065,10 +1078,13 @@ export class Blockchain {
    ]
    );
 console.log(ahh)
-              }
+              }*/
             
             }
             
+      fs.writeFileSync("liqsample.json", JSON.stringify(
+        (opps))
+      )
         } catch (err) {
           console.log(err);
         }
