@@ -8,5 +8,5 @@ do
 echo $bla
 nohup bash untitled.sh $bla &
 bla=`expr $bla - 100000`
-sleep 2
+
 done
