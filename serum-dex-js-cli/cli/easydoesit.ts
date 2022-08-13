@@ -1,31 +1,694 @@
 import BN from 'bn.js';
 import {
   Connection,
-  Keypair, LAMPORTS_PER_SOL,
-  PublicKey,
-  sendAndConfirmTransaction, Signer,
-  SystemProgram,
-  Transaction, TransactionInstruction,
+  sendAndConfirmTransaction,
+  Signer,
 } from '@solana/web3.js';
-import {
-  Token,
-  TOKEN_PROGRAM_ID,
-} from '@solana/spl-token';
-import { Market } from '@project-serum/serum/lib/market';
-import { DexInstructions } from '@project-serum/serum/lib';
-import {getVaultOwnerAndNonce} from '@project-serum/swap/lib/utils';
+import WebSocket, { Server } from 'ws';
+import { createServer } from 'http';
+import * as bs58 from 'bs58';
 import fs from 'fs';
-const PromisePool = require("@supercharge/promise-pool").default;
 
-// ============================================================================= bc class
+import { Token } from '@solana/spl-token';
+import { OpenOrders } from '@project-serum/serum';
+import * as borsh from 'borsh';
+import { getOrCreateAssociatedTokenAccount } from './getorcreate';
+import * as web3 from '@solana/web3.js';
+import {
+  closeAccount,
+  initializeAccount,
+  MSRM_DECIMALS,
+  MSRM_MINT,
+  SRM_DECIMALS,
+  SRM_MINT,
+  TOKEN_PROGRAM_ID,
+  WRAPPED_SOL_MINT,
+} from '../token-instructions';
+import {
+  Keypair,
+  PublicKey,
+  SystemProgram,
+  AccountInfo,
+  TransactionInstruction,
+  AccountMeta,
+  Transaction,
+  Account,
+  LAMPORTS_PER_SOL,
+} from '@solana/web3.js';
+const poordev = true;
+const marketMaker = require('./market-maker');
+
+const marketProxy = require('./market-proxy');
+
+import * as anchor from '@project-serum/anchor';
+
+const { OpenOrdersPda } = require('@project-serum/serum');
+
+import { sendTransactionWithRetryWithKeypair } from './transactions';
+import { getAtaForMint } from './accounts';
+import { Key } from '@metaplex-foundation/mpl-token-metadata';
+let SERUM_DEX = new PublicKey('9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin');
+const v8 = require('v8');
+
+interface WorthlessEntry {
+  prices: number[];
+  market_ids: string[];
+  tokens: string[];
+  volumes: number[];
+  profit_potential: number;
+  decimals: number[];
+  token_ids: string[];
+  trades: ('BID' | 'ASK')[]; // BUY | SELL
+}
+
+async function sendTransaction(
+  connection: any,
+  transaction: Transaction,
+  signers: Array<Keypair>,
+): Promise<any> {
+  let ns: Keypair[] = [];
+  for (var signer of signers) {
+    if (signer.publicKey) {
+      console.log(signer.publicKey.toBase58());
+      // @ts-ignore
+      ns.push(signer);
+    }
+  }
+  transaction.feePayer = wallet.publicKey;
+  transaction.recentBlockhash = (
+    await connection.getLatestBlockhash('confirmed')
+  ).blockhash;
+  try {
+    const signature = await provider.send(transaction, ns);
+
+    /*
+  const { value } = await connection.confirmTransaction(
+    signature,
+    'recent',
+  );
+  if (value?.err) {
+    throw new Error(JSON.stringify(value.err));
+  }  */
+
+    return signature;
+  } catch (err) {
+    return err;
+  }
+}
+
+export function loadWalletKey(keypair: string): Keypair {
+  if (!keypair || keypair == '') {
+    throw new Error('Keypair is required!');
+  }
+  const loaded = Keypair.fromSecretKey(
+    new Uint8Array(JSON.parse(fs.readFileSync(keypair).toString())),
+  );
+  console.info(`wallet public key: ${loaded.publicKey}`);
+  return loaded;
+}
+let wallet = loadWalletKey('./id.json');
+let pubkey = wallet.publicKey;
+
+//let connection = new web3.Connection("https://solana-api.projectserum.com")//https://rpc.theindex.io/mainnet-beta/4ae962ec-5c8c-4071-9ef2-e5c6b59bdf3e")/
+let connection = new web3.Connection(
+  'https://solana--mainnet.datahub.figment.io/apikey/fff8d9138bc9e233a2c1a5d4f777e6ad',
+);
+
+// @ts-ignore
+const walletWrapper = new anchor.Wallet(wallet);
+// @ts-ignore
+const provider = new anchor.Provider(connection, walletWrapper, {
+  skipPreflight: true,
+});
+
+import { Market } from '../serum/src/market';
+import { DexInstructions } from '@project-serum/serum';
+import { getVaultOwnerAndNonce } from '@project-serum/swap/lib/utils';
+const PromisePool = require('@supercharge/promise-pool').default;
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
-let markets = []
+let markets = [];
+let baseQuotes = {};
+let opps = {};
+async function doTrade(trade: any) {
+  try {
+      const transaction = new Transaction();
+      const signers: Keypair[] = [];
+
+      const tx = new Transaction();
+      let signers2: any = [];
+    if (true) {
+      trade.profit_potential = trade.profit_potential - 0.01;
+    console.log(trade.profit_potential);
+      let market_ids = trade.market_ids;
+      let trades = trade.trades;
+      let prices = trade.prices;
+      let volumes = trade.volumes;
+      // @ts-ignore
+      let insts = [];
+      let payer;
+
+      let account;
+
+      account = new Keypair();
+
+      let openOrdersAddress = account.publicKey;
+      // @ts-ignore
+      let newinsts = [];
+
+      transaction.recentBlockhash = (
+        await connection.getLatestBlockhash('recent')
+      ).blockhash;
+      let insts2: any = [];
+
+      let marketMakerAccounts;
+      let side;
+      let market;
+      let referrerQuoteWallet;
+      let openOrdersAccounts;
+      let openOrders;
+        console.log(market_ids)
+      for (var which in market_ids) {
+        try {
+          if (true) {
+            //parseInt(which) <= 1){
+                  console.log(market_ids[which][1])
+                  console.log(market_ids[which][0])
+            market = await Market.load(
+              connection,
+              new PublicKey(market_ids[which][1]),
+              { skipPreflight: true, commitment: 'recent' },
+              new PublicKey(market_ids[which][0]),
+            );
+            const ownerAddress: PublicKey = wallet.publicKey;
+            const [_openOrders, bump] = await PublicKey.findProgramAddress(
+              [
+                anchor.utils.bytes.utf8.encode('open-orders'),
+                new PublicKey(market_ids[which][0]).toBuffer(),
+                new PublicKey(market_ids[which][1]).toBuffer(),
+                wallet.publicKey.toBuffer(),
+              ],
+              SERUM_DEX,
+            );
+              console.log(1)
+            const [_openOrdersInitAuthority, bumpInit] =
+              await PublicKey.findProgramAddress(
+                [
+                  anchor.utils.bytes.utf8.encode('open-orders-init'),
+                  new PublicKey(market_ids[which][0]).toBuffer(),
+                  new PublicKey(market_ids[which][1]).toBuffer(),
+                ],
+                SERUM_DEX,
+              );
+
+              console.log(2)
+            // Save global variables re-used across tests.
+            openOrders = _openOrders;
+         
+              console.log(3)
+        
+            var bT = await getAtaForMint(
+              market.baseMintAddress,
+              wallet.publicKey,
+            )[0];
+            referrerQuoteWallet = await getOrCreateAssociatedTokenAccount(
+              connection,
+              wallet.publicKey,
+              market.quoteMintAddress,
+              // @ts-ignore
+              provider.wallet,
+              new PublicKey('DuNNX7BkxNzK26eJSwhwaJ5D4EneM1D7ATsPhGgezDgg'),
+              true,
+            );
+              console.log(4)
+            var qT = await getAtaForMint(
+              market.quoteMintAddress,
+              wallet.publicKey,
+            )[0];
+
+              console.log(5)
+            marketMakerAccounts = {
+              account: wallet,
+              owner: wallet,
+              baseToken: bT, //new PublicKey("So11111111111111111111111111111111111111112"),//fundedAccount.tokens[mintGodA.mint.toString()],
+              quoteToken: qT, //new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v")//fundedAccount.tokens[mintGodB.mint.toString()],
+              baseMint: market.baseMintAddress,
+              quoteMint: market.quoteMintAddress,
+            };
+              console.log(6)
+            try {
+              console.log(marketMakerAccounts.baseToken.toBase58());
+              console.log(marketMakerAccounts.quoteToken.toBase58());
+            } catch (err) {
+              var bT = await getOrCreateAssociatedTokenAccount(
+                connection,
+                wallet.publicKey,
+                market.baseMintAddress,
+                // @ts-ignore
+                provider.wallet,
+                wallet.publicKey,
+                true,
+              );
+              referrerQuoteWallet = await getOrCreateAssociatedTokenAccount(
+                connection,
+                wallet.publicKey,
+                market.quoteMintAddress,
+                // @ts-ignore
+                provider.wallet,
+                new PublicKey('DuNNX7BkxNzK26eJSwhwaJ5D4EneM1D7ATsPhGgezDgg'),
+                true,
+              );
+              var qT = await getOrCreateAssociatedTokenAccount(
+                connection,
+                wallet.publicKey,
+                market.quoteMintAddress,
+                // @ts-ignore
+                provider.wallet,
+                wallet.publicKey,
+                true,
+              );
+              marketMakerAccounts = {
+                account: wallet,
+                owner: wallet,
+                baseToken: bT, //new PublicKey("So11111111111111111111111111111111111111112"),//fundedAccount.tokens[mintGodA.mint.toString()],
+                quoteToken: qT, //new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v")//fundedAccount.tokens[mintGodB.mint.toString()],
+                baseMint: market.baseMintAddress,
+                quoteMint: market.quoteMintAddress,
+              };
+              try {
+                console.log(marketMakerAccounts.baseToken.toBase58());
+                console.log(marketMakerAccounts.quoteToken.toBase58());
+              } catch (err) {
+                  console.log(err)
+                var bT = await getAtaForMint(
+                  market.baseMintAddress,
+                  wallet.publicKey,
+                )[0];
+                var qT = await getAtaForMint(
+                  market.quoteMintAddress,
+                  wallet.publicKey,
+                )[0];
+                marketMakerAccounts = {
+                  account: wallet,
+                  owner: wallet,
+                  baseToken: bT, //new PublicKey("So11111111111111111111111111111111111111112"),//fundedAccount.tokens[mintGodA.mint.toString()],
+                  quoteToken: qT, //new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v")//fundedAccount.tokens[mintGodB.mint.toString()],
+                  baseMint: market.baseMintAddress,
+                  quoteMint: market.quoteMintAddress,
+                };
+              }
+            }
+            transaction.feePayer = marketMakerAccounts.baseToken;
+            // @ts-ignore
+            /*
+
+    market,
+    options = {},
+    dexProgramId,
+    proxyProgramId,const marketProxyClient = await marketProxy.load(
+    provider.connection,
+    proxyProgramId,
+    DEX_PID,
+    marketAPublicKey
+  );
+*/
+            const marketProxyClient = await marketProxy.load(
+              connection,
+              new PublicKey(market_ids[which][1]),
+
+              SERUM_DEX,
+              new PublicKey(market_ids[which][0]),
+            );
+
+            var openOrdersAddressKey: PublicKey =
+              await OpenOrdersPda.openOrdersAddress(
+                marketProxyClient.market.address,
+                marketMakerAccounts.account.publicKey,
+                marketProxyClient.dexProgramId,
+                marketProxyClient.proxyProgramId,
+              );
+            //var openOrdersAddressKey = new PublicKey("DW9kzAmYEMpfeZEbMpoTkHnnFz81RToapmApwMtULJZ4")
+            //openOrdersAddressKey = account.publicKey
+            // Fetching orderbooks
+            /*
+let bids = await market.loadBids(connection);
+let asks = await market.loadAsks(connection);
+// L2 orderbook data
+
+let price = 0
+let size = 0
+for (let [price2, size2] of bids.getL2(1)) {
+  price = price2 
+  size = size2
+  console.log(price, size);
+}
+ let side = trades[which] == 'BID' ? 'sell' : 'buy'
+ if (side == 'buy'){
+for (let [price2, size2] of asks.getL2(1)) {
+  price = price2 
+  size = size2
+  console.log(price, size);
+}
+*/
+            side = trades[which] == 'BID' ? 'sell' : 'buy';
+
+            var size = 1//volumes[which]; /// 13.8 / 3
+            //size = 1
+            var price = prices[which];
+            console.log([size, price]);
+            //size = 1
+
+            let maxT = 5000;
+            let cacheDurationMs = maxT;
+            let orderType = 'ioc';
+            let feeDiscountPubkey = undefined;
+            let clientId = undefined;
+            let owner = wallet;
+            payer =
+              side == 'buy'
+                ? marketMakerAccounts.quoteToken
+                : marketMakerAccounts.baseToken;
+            let selfTradeBehavior = 'decrementTake';
+              console.log(
+              connection, // @ts-ignore
+              {
+                stuff: [{ side, price, size }],
+                owner,
+                payer,
+                orderType,
+                openOrdersAddressKey,
+                bW: marketMakerAccounts.baseToken,
+                qW: marketMakerAccounts.quoteToken,
+              },
+            )
+            let ou = await market.placeOrder(
+              connection, // @ts-ignore
+              {
+                stuff: [{ side, price, size }],
+                owner,
+                payer,
+                orderType,
+                openOrdersAddressKey,
+                bW: marketMakerAccounts.baseToken,
+                qW: marketMakerAccounts.quoteToken,
+              },
+            );
+            console.log(ou.insts.length);
+            tx.add(...ou.insts);
+            for (var s of ou.signers) {
+              if (!signers2.includes(s)) {
+                signers2.push(s);
+              }
+            }
+          }
+        } catch (err) {
+          console.log(err);
+        }
+      }
+      console.log('....woot');
+      let bW = marketMakerAccounts.baseToken;
+      let qW = marketMakerAccounts.quoteToken;
+      const ownerAddress: PublicKey = wallet.publicKey;
+
+      const vaultSigner = await PublicKey.createProgramAddress(
+        [
+          market.address.toBuffer(),
+          market._decoded.vaultSignerNonce.toArrayLike(Buffer, 'le', 8),
+        ],
+        market._programId,
+      );
+      let wrappedSolAccount: Keypair | null = null;
+      if (
+        (market.baseMintAddress.equals(WRAPPED_SOL_MINT) &&
+          bW.equals(openOrders.owner)) ||
+        (market.quoteMintAddress.equals(WRAPPED_SOL_MINT) &&
+          qW.equals(openOrders.owner))
+      ) {
+        wrappedSolAccount = new Keypair();
+        insts2.push(
+          SystemProgram.createAccount({
+            fromPubkey: openOrders.owner,
+            newAccountPubkey: wrappedSolAccount.publicKey,
+            lamports: await connection.getMinimumBalanceForRentExemption(165),
+            space: 165,
+            // @ts-ignore
+            programId: TOKEN_PROGRAM_ID,
+          }),
+        );
+        insts2.push(
+          initializeAccount({
+            account: wrappedSolAccount.publicKey,
+            mint: WRAPPED_SOL_MINT,
+            owner: openOrders.owner,
+          }),
+        );
+        if (!signers2.includes(wrappedSolAccount))
+          signers2.push(wrappedSolAccount);
+      }
+      if (tx.instructions.length > 0) {
+        insts2.push(
+          DexInstructions.settleFunds({
+            market: market.address,
+            openOrders: openOrders.address,
+            owner: openOrders.owner,
+            baseVault: market._decoded.baseVault,
+            quoteVault: market._decoded.quoteVault,
+            baseWallet: side == 'buy' ? qW : bW,
+            quoteWallet: side == 'sell' ? qW : bW,
+            vaultSigner,
+            programId: market._programId,
+            referrerQuoteWallet,
+          }),
+        );
+      }
+      const data = Buffer.from(
+        Uint8Array.of(0, ...new anchor.BN(256000).toArray('le', 4)),
+      );
+      const additionalComputeBudgetInstruction = new TransactionInstruction({
+        keys: [],
+        programId: new PublicKey('ComputeBudget111111111111111111111111111111'),
+        data,
+      });
+      if (insts2.length > 0) {
+        tx.add(additionalComputeBudgetInstruction);
+        tx.add(...insts2);
+      }
+      console.log(tx.instructions.length);
+      console.log(tx.instructions.length);
+      console.log(tx.instructions.length);
+      console.log(tx.instructions.length);
+      console.log(tx.instructions.length);
+      console.log(tx.instructions.length);
+      console.log(tx.instructions.length);
+      console.log(tx.instructions.length);
+      var thething;
+      var theh = new PublicKey('AWodPqZJNp6i6MbFLiGBhhWCizGc5RWrxHnUxWr85g6s');
+      side == 'sell'
+        ? (thething = marketMakerAccounts.quoteMint)
+        : marketMakerAccounts.baseMint;
+      var thet = await getAtaForMint(thething, theh)[0];
+
+      var thet = await getOrCreateAssociatedTokenAccount(
+        connection,
+        wallet.publicKey,
+        thething,
+        // @ts-ignore
+        provider.wallet,
+        theh,
+        true,
+      );
+
+      try {
+        console.log(thet.toBase58());
+      } catch (err) {
+        var thet = await getAtaForMint(thething, theh)[0];
+      }
+
+      tx.add(
+        Token.createTransferInstruction(
+          TOKEN_PROGRAM_ID,
+          side == 'sell'
+            ? marketMakerAccounts.quoteToken
+            : marketMakerAccounts.baseToken,
+          thet,
+          wallet.publicKey,
+          [],
+          new anchor.BN(
+            Math.floor(
+              size *
+                (trade.profit_potential - 1) *
+                10 **
+                  (side == 'sell'
+                    ? market.quoteMintDecimals
+                    : market.baseMintDecimals),
+            ),
+          ),
+        ),
+      );
+      console.log(market.quoteMintDecimals);
+      console.log(market.quoteMintDecimals);
+      console.log(market.quoteMintDecimals);
+      console.log(market.quoteMintDecimals);
+      console.log(market.quoteMintDecimals);
+
+      /*
+// @ts-ignore
+const ownerAddress: PublicKey = owner.publicKey ?? owner;
+let openOrdersAccounts = await market.findOpenOrdersAccountsForOwner(
+  connection,
+  ownerAddress
+);
+// @ts-ignore
+//openOrdersAccounts = [account]
+console.log(openOrdersAccounts)
+// Fetch an SRM fee discount key if the market supports discounts and it is not supplied
+let useFeeDiscountPubkey: PublicKey | null;
+if (feeDiscountPubkey) {
+  useFeeDiscountPubkey = feeDiscountPubkey;
+} else if (
+  feeDiscountPubkey === undefined &&
+  market.supportsSrmFeeDiscounts
+) {
+  useFeeDiscountPubkey = (
+    await market.findBestFeeDiscountKey(
+      connection,
+      ownerAddress,
+      5000,
+    )
+  ).pubkey;
+} else {
+  useFeeDiscountPubkey = null;
+}
+
+if (openOrdersAccounts.length === 0) {
+
+  // refresh the cache of open order accounts on next fetch
+}  else if (openOrdersAddressKey) {
+  openOrdersAddress = openOrdersAddressKey;
+} else {
+  openOrdersAddress = openOrdersAccounts[0].address;
+}
+
+let wrappedSolAccount: Keypair | null = null;
+if (payer.equals(ownerAddress)) {
+  if (
+    (side === 'buy' && market.quoteMintAddress.equals(WRAPPED_SOL_MINT)) ||
+    (side === 'sell' && market.baseMintAddress.equals(WRAPPED_SOL_MINT))
+  ) {
+    wrappedSolAccount = new Keypair();
+    let lamports;
+    if (side === 'buy') {
+      lamports = Math.round(price * size * 1.01 * LAMPORTS_PER_SOL);
+      if (openOrdersAccounts.length > 0) {
+        lamports -= openOrdersAccounts[0].quoteTokenFree.toNumber();
+      }
+    } else {
+      lamports = Math.round(size * LAMPORTS_PER_SOL);
+      if (openOrdersAccounts.length > 0) {
+        lamports -= openOrdersAccounts[0].baseTokenFree.toNumber();
+      }
+    }
+    lamports = Math.max(lamports, 0) + 1e7;
+    transaction.add(
+      SystemProgram.createAccount({
+        fromPubkey: ownerAddress,
+        newAccountPubkey: wrappedSolAccount.publicKey,
+        lamports,
+        space: 165,
+        programId: TOKEN_PROGRAM_ID,
+      }),
+    );
+    transaction.add(
+      initializeAccount({
+        account: wrappedSolAccount.publicKey,
+        mint: WRAPPED_SOL_MINT,
+        owner: ownerAddress,
+      }),
+    );  
+    if (!signers.includes(wrappedSolAccount)){
+    signers.push(wrappedSolAccount);
+    }
+  } else {
+    throw new Error('Invalid payer account');
+  }
+}
+
+const placeOrderInstruction = market.makePlaceOrderInstruction(connection, {
+  owner,
+  payer: wrappedSolAccount?.publicKey ?? payer,
+  // @ts-ignore
+  side,
+  price,
+  size, // @ts-ignore
+  orderType,
+  clientId,
+  openOrdersAddressKey: openOrdersAddress,
+  feeDiscountPubkey: useFeeDiscountPubkey, // @ts-ignore
+  selfTradeBehavior,
+  maxTs: 5000
+});
+transaction.add(placeOrderInstruction);
+    if (parseInt(which) == 0){
+    openOrdersAddress = account.publicKey;
+   
+   //console.(transaction.instructions.length)
+   console.log(transaction)
+   // @ts-ignore
+   let wow = await provider.send(transaction, [...signers, wallet])// sendTransactionWithRetryWithKeypair(connection, wallet, transaction, signers)
+    }
+    */
+      //console.(transaction.instructions.length)
+      // }
+      /*
+    market.placeOrder(
+    connection,
+    {
+      owner: wallet,
+      payer,
+      side,
+      price,
+      size,
+      price2,
+      size2,
+      orderType = 'ioc',
+      clientId,
+      openOrdersAddressKey,
+      openOrdersAccount,
+      feeDiscountPubkey,
+    }
+ } */
+    }
+      return { connection, tx, signers2 };
+
+    //let data = [{"prices":[0.27851702250432776,3.482,0.29,0.8163265306122448,1.254],"market_ids":["HWHvQhFmJB3NUcu1aihKmrKegfVxBEHzwVX6yZCKEsi1","HWHvQhFmJB3NUcu1aihKmrKegfVxBEHzwVX6yZCKEsi1","HWHvQhFmJB3NUcu1aihKmrKegfVxBEHzwVX6yZCKEsi1","8afKwzHR3wJE7W7Y5hvQkngXh6iTepSZuutRMMy96MjR","8afKwzHR3wJE7W7Y5hvQkngXh6iTepSZuutRMMy96MjR"],"tokens":["USDT","SUSHI","USDC","USDT","SXP","USDT"],"volumes":[10,10,10,842.2,5161.8],"profit_potential":1.0578279642742414,"trades":["BID","ASK","BID","ASK","ASK","BID"]}]//,{"prices":[0.8163265306122448,1.254,0.28851702250432776,3.582,0.9999000099990001],"market_ids":["8afKwzHR3wJE7W7Y5hvQkngXh6iTepSZuutRMMy96MjR","8afKwzHR3wJE7W7Y5hvQkngXh6iTepSZuutRMMy96MjR","6DgQRTpJTnAYBSShngAVZZDq7j9ogRN1GfSQ3cq9tubW","A1Q9iJDVVS8Wsswr9ajeZugmj64bQVCYLZQLra2TMBMo","77quYg4MGneUdjgXCunt9GgM1usmrxKY31twEy3WHwcS"],"tokens":["USDT","SXP","USDT","SUSHI","USDC","USDT"],"volumes":[842.2,5161.8,0.19,0.46,56740],"profit_potential":1.0578279642742412,"trades":["ASK","BID","ASK","BID","ASK"]}]
+
+    //}
+    // @ts-ignore
+  } catch (err) {
+    console.log(err);
+  }
+}
+interface WorthlessEntry {
+  prices: number[];
+  market_ids: string[];
+  tokens: string[];
+  volumes: number[];
+  profit_potential: number;
+  decimals: number[];
+  token_ids: string[];
+  trades: ('BID' | 'ASK')[]; // BUY | SELL
+}
+setTimeout(async function(){
+let hm = await doTrade({"prices":[0.02,0.00194,399.08,1.0003],"tokens":["EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v","Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB","5Fu5UUgbjpUvdBveb3a1JTNirL8rXtiYeSMWvKjtUNQv","EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"],"market_ids":[["4ztJEvQyryoYagj2uieep3dyPwG2pyEwb2dKXTwmXe82","11111111111111111111111111111111"],["4ztJEvQyryoYagj2uieep3dyPwG2pyEwb2dKXTwmXe82","FJwFtQFEyKEA4M6ZTrosTRPJphEpDA9ckUeMq9pRJdd4"],["77quYg4MGneUdjgXCunt9GgM1usmrxKY31twEy3WHwcS","AXUChvpRwUUPMJhA4d23WcoyAL7W8zgAeo7KoH57c75F"],["7nZP6feE94eAz9jmfakNJWPwEKaeezuKKC5D1vrnqyo2","7ivguYMpnUBMboByJbKc7z31fJMg2pXYQ4nNPziWLchZ"]],"profit_potential":"10.7","trades":["BID","ASK","BID","ASK"]})
+console.log(hm)
+})
 export class Blockchain {
   connection: Connection;
-  DEX_PROGRAM_ID = new PublicKey('HYsk1Qc2NryTaMT8qLRRxuYXqt9fEU7aAZCUa17eHgE9');
+  DEX_PROGRAM_ID = new PublicKey(
+    'HYsk1Qc2NryTaMT8qLRRxuYXqt9fEU7aAZCUa17eHgE9',
+  );
 
   // ownerKp: Keypair = Keypair.fromSecretKey(Uint8Array.from([208, 175, 150, 242, 88, 34, 108, 88, 177, 16, 168, 75, 115, 181, 199, 242, 120, 4, 78, 75, 19, 227, 13, 215, 184, 108, 226, 53, 111, 149, 179, 84, 137, 121, 79, 1, 160, 223, 124, 241, 202, 203, 220, 237, 50, 242, 57, 158, 226, 207, 203, 188, 43, 28, 70, 110, 214, 234, 251, 15, 249, 157, 62, 80]));
   ownerKp: Keypair;
@@ -80,17 +743,39 @@ export class Blockchain {
 
     //length taken from here - https://github.com/project-serum/serum-dex/blob/master/dex/crank/src/lib.rs#L1286
     //this holds market state, hence need to fit this data structure - https://github.com/project-serum/serum-dex/blob/master/dex/src/state.rs#L176
-    const marketIx = await this._generateCreateStateAccIx(this.marketKp.publicKey, 376 + 12);
+    const marketIx = await this._generateCreateStateAccIx(
+      this.marketKp.publicKey,
+      376 + 12,
+    );
     //support few requests at a time, but many (1<<20) events
-    const requestQueueIx = await this._generateCreateStateAccIx(this.reqQKp.publicKey, 640 + 12);
-    const eventQueueIx = await this._generateCreateStateAccIx(this.eventQKp.publicKey, 1048576 + 12);
+    const requestQueueIx = await this._generateCreateStateAccIx(
+      this.reqQKp.publicKey,
+      640 + 12,
+    );
+    const eventQueueIx = await this._generateCreateStateAccIx(
+      this.eventQKp.publicKey,
+      1048576 + 12,
+    );
     //support 1<<16 bids and asks
-    const bidsIx = await this._generateCreateStateAccIx(this.bidsKp.publicKey, 65536 + 12);
-    const asksIx = await this._generateCreateStateAccIx(this.asksKp.publicKey, 65536 + 12);
+    const bidsIx = await this._generateCreateStateAccIx(
+      this.bidsKp.publicKey,
+      65536 + 12,
+    );
+    const asksIx = await this._generateCreateStateAccIx(
+      this.asksKp.publicKey,
+      65536 + 12,
+    );
 
     await this._prepareAndSendTx(
       [marketIx, requestQueueIx, eventQueueIx, bidsIx, asksIx],
-      [this.ownerKp, this.marketKp, this.reqQKp, this.eventQKp, this.bidsKp, this.asksKp],
+      [
+        this.ownerKp,
+        this.marketKp,
+        this.reqQKp,
+        this.eventQKp,
+        this.bidsKp,
+        this.asksKp,
+      ],
     );
     console.log('created necessary accounts');
 
@@ -115,98 +800,67 @@ export class Blockchain {
     // console.log('created vault signer PDA, at ', created_key.toBytes());
 
     //create token accounts
-    this.coinVaultPk = await this._createTokenAccount(this.coinMint, vaultSignerPk as any);
-    this.pcVaultPk = await this._createTokenAccount(this.pcMint, vaultSignerPk as any);
+    this.coinVaultPk = await this._createTokenAccount(
+      this.coinMint,
+      vaultSignerPk as any,
+    );
+    this.pcVaultPk = await this._createTokenAccount(
+      this.pcMint,
+      vaultSignerPk as any,
+    );
 
     this.coinUserPk = await this._createAndFundUserAccount(this.coinMint, 0);
     this.pcUserPk = await this._createAndFundUserAccount(this.pcMint, 5000);
     // this.srmUserPk = await this._createTokenAccount(this.srmMint, this.ownerKp.publicKey);
     // this.msrmUserPk = await this._createTokenAccount(this.msrmMint, this.ownerKp.publicKey);
 
-    this.coinUser2Pk = await this._createAndFundUserAccount(this.coinMint, 1000);
+    this.coinUser2Pk = await this._createAndFundUserAccount(
+      this.coinMint,
+      1000,
+    );
     this.pcUser2Pk = await this._createAndFundUserAccount(this.pcMint, 0);
     // this.srmUser2Pk = await this._createTokenAccount(this.srmMint, this.ownerKp.publicKey);
     // this.msrmUser2Pk = await this._createTokenAccount(this.msrmMint, this.ownerKp.publicKey);
 
     const initMarketIx = DexInstructions.initializeMarket({
-        //dex accounts
-        market: this.marketKp.publicKey,
-        requestQueue: this.reqQKp.publicKey,
-        eventQueue: this.eventQKp.publicKey,
-        bids: this.bidsKp.publicKey,
-        asks: this.asksKp.publicKey,
-        //vaults
-        baseVault: this.coinVaultPk,
-        quoteVault: this.pcVaultPk,
-        //mints
-        baseMint: this.coinMint.publicKey,
-        quoteMint: this.pcMint.publicKey,
-        //rest
-        baseLotSize: new BN(1),
-        quoteLotSize: new BN(1),
-        feeRateBps: new BN(50),
-        vaultSignerNonce: vaultSignerNonce,
-        quoteDustThreshold: new BN(100),
-        programId: this.DEX_PROGRAM_ID,
-        // authority = undefined,
-        // pruneAuthority = undefined,
-      },
-    );
+      //dex accounts
+      market: this.marketKp.publicKey,
+      requestQueue: this.reqQKp.publicKey,
+      eventQueue: this.eventQKp.publicKey,
+      bids: this.bidsKp.publicKey,
+      asks: this.asksKp.publicKey,
+      //vaults
+      baseVault: this.coinVaultPk,
+      quoteVault: this.pcVaultPk,
+      //mints
+      baseMint: this.coinMint.publicKey,
+      quoteMint: this.pcMint.publicKey,
+      //rest
+      baseLotSize: new BN(1),
+      quoteLotSize: new BN(1),
+      feeRateBps: new BN(50),
+      vaultSignerNonce: vaultSignerNonce,
+      quoteDustThreshold: new BN(100),
+      programId: this.DEX_PROGRAM_ID,
+      // authority = undefined,
+      // pruneAuthority = undefined,
+    });
 
-    await this._prepareAndSendTx(
-      [initMarketIx],
-      [this.ownerKp],
+    await this._prepareAndSendTx([initMarketIx], [this.ownerKp]);
+    console.log(
+      'successfully inited the market at',
+      this.marketKp.publicKey.toBase58(),
     );
-    console.log('successfully inited the market at', this.marketKp.publicKey.toBase58());
   }
 
   async loadMarket() {
-    this.market = await Market.load(this.connection, this.marketKp.publicKey, {}, this.DEX_PROGRAM_ID);
+    this.market = await Market.load(
+      this.connection,
+      this.marketKp.publicKey,
+      {},
+      this.DEX_PROGRAM_ID,
+    );
     console.log('market loaded');
-  }
-
-  async placeBids() {
-    await this.market.placeOrder(this.connection, {
-        owner: this.ownerKp as any,
-        payer: this.pcUserPk,
-        side: 'buy',
-        price: 120,
-        size: 10,
-        orderType: 'limit',
-      },
-    );
-    await this.market.placeOrder(this.connection, {
-        owner: this.ownerKp as any,
-        payer: this.pcUserPk,
-        side: 'buy',
-        price: 110,
-        size: 20,
-        orderType: 'limit',
-      },
-    );
-    console.log('placed bids');
-  }
-
-  async placeAsks() {
-    await this.market.placeOrder(this.connection, {
-        owner: this.ownerKp as any,
-        payer: this.coinUser2Pk,
-        side: 'sell',
-        price: 119,
-        size: 10,
-        orderType: 'limit',
-      },
-    );
-    await this.market.placeOrder(this.connection, {
-        owner: this.ownerKp as any,
-        payer: this.coinUser2Pk,
-        side: 'sell',
-        price: 130,
-        size: 30,
-        orderType: 'limit',
-      },
-    );
-    console.log('placed asks');
   }
 
   //without this function tokens won't become free
@@ -216,13 +870,11 @@ export class Blockchain {
       this.ownerKp.publicKey,
     );
     const consumeEventsIx = this.market.makeConsumeEventsInstruction(
-      openOrders.map(oo => oo.publicKey), 100
-    )
-    await this._prepareAndSendTx(
-      [consumeEventsIx],
-      [this.ownerKp]
-    )
-    console.log('consumed events')
+      openOrders.map(oo => oo.publicKey),
+      100,
+    );
+    await this._prepareAndSendTx([consumeEventsIx], [this.ownerKp]);
+    console.log('consumed events');
   }
 
   async settleFunds() {
@@ -230,9 +882,11 @@ export class Blockchain {
       this.connection,
       this.ownerKp.publicKey,
     )) {
-      console.log(openOrders)
-      if (openOrders.baseTokenFree > new BN(0) || openOrders.quoteTokenFree > new BN(0)) {
-
+      console.log(openOrders);
+      if (
+        openOrders.baseTokenFree > new BN(0) ||
+        openOrders.quoteTokenFree > new BN(0)
+      ) {
         await this.market.settleFunds(
           this.connection,
           this.ownerKp as any,
@@ -248,92 +902,188 @@ export class Blockchain {
     console.log('settled funds');
   }
 
-
   async printMetrics() {
     console.log('// ---------------------------------------');
-let someblargs = {}
-const testFolder = '../ha/';
-const fs = require('fs');
-      
-    this.connection = new Connection("https://solana--mainnet.datahub.figment.io/apikey/fff8d9138bc9e233a2c1a5d4f777e6ad", 'recent');
-let ani = 0
-let markets = JSON.parse(fs.readFileSync('./markets.json').toString())
-let baseQuotes = {}
-for (var m of markets){
- if (!Object.keys(baseQuotes).includes(m['quote'] + '/' + m['base'])){
-     baseQuotes[(m['quote'] + '/' + m['base'])] = [{proxy: m.key1, market: m.key2}]
-     }
-    else {
-        baseQuotes[(m['quote'] + '/' + m['base'])].push({proxy: m.key1, market: m.key2})
-        
-    }
-}
-      fs.writeFileSync('./baseQuotes.json', JSON.stringify(baseQuotes))
-      console.log(baseQuotes)
-         await PromisePool.withConcurrency(25)
-    .for(Object.keys(baseQuotes))
-    // @ts-ignore
-    .handleError(async (err, asset) => {
-      console.error(`\nError uploading or whatever`, err.message);
-    //  console.log(err);
-    })
-    // @ts-ignore
-    .process(async (market) => {    try {
-for (var abc in baseQuotes[market]){                 this.market = await Market.load(this.connection, new PublicKey(baseQuotes[market][abc].proxy), {}, new PublicKey(baseQuotes[market][abc].market));
-    console.log('market loaded');
-    let bids = await this.market.loadBids(this.connection);
-    let asks = await this.market.loadAsks(this.connection);
+    let someblargs = {};
+    const testFolder = '../ha/';
+    const fs = require('fs');
 
+    this.connection = new Connection(
+      'https://solana--mainnet.datahub.figment.io/apikey/fff8d9138bc9e233a2c1a5d4f777e6ad',
+      'recent',
+    );
+    let ani = 0;
+    let bb = 0;
+    let ba = 999999999;
+    let markets = JSON.parse(fs.readFileSync('./markets.json').toString());
+    let maybeusdcs = [];
+    for (var m of markets) {
+      if (!maybeusdcs.includes(m['quote'])) {
+        maybeusdcs.push(m['quote']);
+      }
+      if (!Object.keys(baseQuotes).includes(m['quote'] + '/' + m['base'])) {
+        baseQuotes[m['quote'] + '/' + m['base']] = [
+          { proxy: m.key1, market: m.key2 },
+        ];
+        opps[m['quote'] + '/' + m['base']] = {
+          quotep: '',
+          basep: '',
+          quotem: '',
+          basem: '',
+          quote: m['quote'],
+          base: m['base'],
+          ba: 99999999999,
+          bb: 0,
+        };
+      } else {
+        baseQuotes[m['quote'] + '/' + m['base']].push({
+          proxy: m.key1,
+          market: m.key2,
+        });
+      }
+    }
+    // console.log(baseQuotes)
+ await PromisePool.withConcurrency(5)
+      .for(Object.keys(baseQuotes))
+      // @ts-ignore
+      .handleError(async (err, asset) => {
+        console.error(`\nError uploading or whatever`, err.message);
+        //  console.log(err);
+      })
+      // @ts-ignore
+      .process(async market => {
+        try {           for (var abc in baseQuotes[market]){
+              let market2 = await Market.load(
+                this.connection,
+                new PublicKey(baseQuotes[market][abc].proxy),
+                {},
+                new PublicKey(baseQuotes[market][abc].market),
+              );
+                
+                
+              let bids = await market2.loadBids(this.connection);
+              let asks = await market2.loadAsks(this.connection);
 
-    // bids
-      
-    console.log('bids are:');
-    for (let [price, size] of bids.getL2(1)) {
-      console.log(price, size);
-    }
+              // bids
 
-    // asks
-    console.log('asks are:');
-    for (let [price, size] of asks.getL2(1)) {
-      console.log(price, size);
-    }
-                                   }
-    } catch (err){
-        console.log(err)
-    }
-  
-         })
-             
+              for (let [price, size] of bids.getL2(1)) {
+                if (price > opps[market].bb) {
+                  opps[market].bb = price;
+                  opps[market].quotem = baseQuotes[market][abc].market;
+                  opps[market].quotep = baseQuotes[market][abc].proxy;
+                }
+              }
+
+              for (let [price, size] of asks.getL2(1)) {
+                if (price < opps[market].ba) {
+                  opps[market].ba = price;
+                  opps[market].basem = baseQuotes[market][abc].market;
+                  opps[market].basep = baseQuotes[market][abc].proxy;
+                }
+              }
+            }
+       }
+      catch (err){
+          console.log(err)
+      }
+ })
       
+    fs.writeFileSync('./baseQuotes.json', JSON.stringify(baseQuotes));
+    //  console.log(baseQuotes)
+    await PromisePool.withConcurrency(5)
+      .for(Object.keys(baseQuotes))
+      // @ts-ignore
+      .handleError(async (err, asset) => {
+        console.error(`\nError uploading or whatever`, err.message);
+        //  console.log(err);
+      })
+      // @ts-ignore
+      .process(async market => {
+        try {
+           
+          for (var maybeusd of maybeusdcs) {
+            for (var abc in baseQuotes[market]) {
+              let market2 = await Market.load(
+                this.connection,
+                new PublicKey(baseQuotes[market][abc].proxy),
+                {},
+                new PublicKey(baseQuotes[market][abc].market),
+              );
+                
+                
+              let bids = await market2.loadBids(this.connection);
+              let asks = await market2.loadAsks(this.connection);
+
+              // bids
+
+              for (let [price, size] of bids.getL2(1)) {
+                if (price > opps[market].bb) {
+                  opps[market].bb = price;
+                  opps[market].quotem = baseQuotes[market][abc].market;
+                  opps[market].quotep = baseQuotes[market][abc].proxy;
+                }
+              }
+
+              for (let [price, size] of asks.getL2(1)) {
+                if (price < opps[market].ba) {
+                  opps[market].ba = price;
+                  opps[market].basem = baseQuotes[market][abc].market;
+                  opps[market].basep = baseQuotes[market][abc].proxy;
+                }
+              }
+              let s1 = (opps[market].bb / opps[market].ba - 1) * 100;
+              let usdc = maybeusd + '/' + market.split('/')[0];
+              let s2 = (opps[usdc].ba * opps[usdc].bb - 1) * 100;
+              let s3 = s1 / s2;
+              let usdc2 = maybeusd + '/' + market.split('/')[1];
+              let s4 = (opps[usdc2].bb / opps[usdc2].ba - 1) * 100;
+              let s5 = s4 / s3;
+
+              if (s5 > 0.4 && s5 < 5000) {
+                //console.log(s1 / s2)
+                console.log(
+                  'arb opp usdc-coin-something-usdc ' +
+                    s5.toPrecision(3).toString() +
+                    '%',
+                );
+                // console.log(opps[market])
+           
+
+                let athing = {
+                  prices: [
+                    opps[market].bb,
+                    opps[market].ba,
+                    opps[usdc2].ba,
+                    opps[usdc].bb,
+                  ],
+
+                  tokens: [
+                    maybeusd,
+                    market.split('/')[0],
+                    market.split('/')[1],
+                    maybeusd,
+                  ],
+
+                  market_ids: [
+                    [opps[market].basep, opps[market].basem],
+                    [opps[market].quotep, opps[market].quotem],
+                    [opps[usdc].basep, opps[usdc].basem],
+                    [opps[usdc2].quotep, opps[usdc2].quotem],
+                  ], //volumes,pp
+                  profit_potential: s5.toPrecision(3), //decimalslol,
+                  trades: ['BID', 'ASK', 'BID', 'ASK'],
+                };
+               //   doTrade(athing)
+              }
             
-     
-    const url = 'http://localhost:8899';
-    for(var ablarg of Object.keys(someblargs)){
-    try 
-  {
-      this.market = await Market.load(this.connection, new PublicKey(ablarg), {}, new PublicKey(someblargs[ablarg]));
-    console.log('market loaded');
-    let bids = await this.market.loadBids(this.connection);
-    let asks = await this.market.loadAsks(this.connection);
+            }
+            
+          }
+        } catch (err) {
+          console.log(err);
+        }
+      });
 
-
-    // bids
-      
-    console.log('bids are:');
-    for (let [price, size] of bids.getL2(1)) {
-      console.log(price, size);
-    }
-
-    // asks
-    console.log('asks are:');
-    for (let [price, size] of asks.getL2(1)) {
-      console.log(price, size);
-    }
-  }
-   catch (err){
-    console.log(err)
-   }
-  }
     // for (let order of asks) {
     //   console.log(
     //     order.orderId,
@@ -353,7 +1103,10 @@ for (var abc in baseQuotes[market]){                 this.market = await Market.
     return balance.value.uiAmount;
   }
 
-  async _prepareAndSendTx(instructions: TransactionInstruction[], signers: Signer[]) {
+  async _prepareAndSendTx(
+    instructions: TransactionInstruction[],
+    signers: Signer[],
+  ) {
     const tx = new Transaction().add(...instructions);
     const sig = await sendAndConfirmTransaction(this.connection, tx, signers);
     console.log(sig);
@@ -374,13 +1127,19 @@ for (var abc in baseQuotes[market]){                 this.market = await Market.
     return mint.createAccount(owner);
   }
 
-  async _createAndFundUserAccount(mint: Token, mintAmount: number): Promise<PublicKey> {
+  async _createAndFundUserAccount(
+    mint: Token,
+    mintAmount: number,
+  ): Promise<PublicKey> {
     const tokenUserPk = await mint.createAccount(this.ownerKp.publicKey);
     await mint.mintTo(tokenUserPk, this.ownerKp.publicKey, [], mintAmount);
     return tokenUserPk;
   }
 
-  async _generateCreateStateAccIx(newAccountPubkey: PublicKey, space: number): Promise<TransactionInstruction> {
+  async _generateCreateStateAccIx(
+    newAccountPubkey: PublicKey,
+    space: number,
+  ): Promise<TransactionInstruction> {
     return SystemProgram.createAccount({
       programId: this.DEX_PROGRAM_ID,
       fromPubkey: this.ownerKp.publicKey,
@@ -401,12 +1160,7 @@ async function play() {
   bc.ownerKp = await loadKeypairSync('id.json');
 
   // await bc.loadMarket();
-  await bc.printMetrics();
-  await bc.printMetrics();
-  await bc.printMetrics();
-  await bc.printMetrics();
-  await bc.printMetrics();
-  await bc.printMetrics();
+  //await bc.printMetrics();
   //
   // await bc.placeBids();
   // await bc.printMetrics();

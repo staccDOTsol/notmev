@@ -7,6 +7,6 @@ while [ $bla -gt $((bla-5000000)) ]
 do
 echo $bla
 nohup bash untitled.sh $bla &
-bla=`expr $bla - 10000`
+bla=`expr $bla - 100000`
 sleep 2
 done

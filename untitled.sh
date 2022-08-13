@@ -1,7 +1,7 @@
 #!/bin/bash
 bla=${1}
 echo $bla
-while [ $bla -gt $((bla-10000)) ]
+while [ $bla -gt $((bla-100000)) ]
 do 
 
 echo $bla

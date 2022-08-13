@@ -297,8 +297,9 @@ try {
   if (!markets.includes({'key1': keys, 'key2': keys2, 'quote': market.decoded.quoteMint.toBase58(), 'base': market.decoded.baseMint.toBase58()})){
     markets.push({'key1': keys, 'key2': keys2, 'quote': market.decoded.quoteMint.toBase58(), 'base': market.decoded.baseMint.toBase58()})
   console.log(markets.length)
-      fs.writeFileSync('markets.json', JSON.stringify(markets))
-  }
+      if (markets.length % 1000 == 0){
+       fs.writeFileSync('markets.json', JSON.stringify(markets))
+  }}
 }
                   catch (err){
   if (err.toString().indexOf('bla') != -1 && err.toString().indexOf('JSON input') != -1){
@@ -322,7 +323,8 @@ try {
             catch(err){  if (err.toString().indexOf('bla') != -1 && err.toString().indexOf('JSON input') != -1){
         console.log(err)
         }
-            }
+            }     
+
      
     const url = 'http://localhost:8899';
     for(var ablarg of Object.keys(someblargs)){
