@@ -261,7 +261,7 @@ fs.readdirSync(testFolder).forEach(async file => {
   files.push(file)  
 })
     try {
-         await PromisePool.withConcurrency(25)
+         await PromisePool.withConcurrency(400)
     .for(files)
     // @ts-ignore
     .handleError(async (err, asset) => {

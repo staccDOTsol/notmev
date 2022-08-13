@@ -60,7 +60,28 @@ interface WorthlessEntry {
   token_ids: string[];
   trades: ('BID' | 'ASK')[]; // BUY | SELL
 }
+function ablarg(market,connection,
+    owner,
+    openOrders,
+    bW,
+    qW,
+    referrerQuoteWallet){
 
+setTimeout(async function(){
+    try {
+    await market.settleFunds(
+        connection,
+    owner,
+    openOrders,
+    bW,
+    qW,
+    referrerQuoteWallet
+        )
+    } catch (err){
+        
+    }
+}, 1000)
+}
 async function sendTransaction(
   connection: any,
   transaction: Transaction,
@@ -111,7 +132,7 @@ let pubkey = wallet.publicKey;
 
 //let connection = new web3.Connection("https://solana-api.projectserum.com")//https://rpc.theindex.io/mainnet-beta/4ae962ec-5c8c-4071-9ef2-e5c6b59bdf3e")/
 let connection = new web3.Connection(
-  'https://solana--mainnet.datahub.figment.io/apikey/fff8d9138bc9e233a2c1a5d4f777e6ad',
+  'https://solana-api.projectserum.com',
 );
 
 // @ts-ignore
@@ -121,7 +142,7 @@ const provider = new anchor.Provider(connection, walletWrapper, {
   skipPreflight: true,
 });
 
-import { Market } from '../packages/serum/src/market';
+import { Market } from '../packages/serum/src';
 import { DexInstructions } from '@project-serum/serum';
 import { getVaultOwnerAndNonce } from '@project-serum/swap/lib/utils';
 const PromisePool = require('@supercharge/promise-pool').default;
@@ -178,9 +199,9 @@ async function doTrade(trade: any) {
                   console.log(market_ids[which][0])
             market = await Market.load(
               connection,
-              new PublicKey(market_ids[which][1]),
-              { skipPreflight: true, commitment: 'recent' },
               new PublicKey(market_ids[which][0]),
+              { skipPreflight: true, commitment: 'recent' },
+              new PublicKey(market_ids[which][1]),
             );
             const ownerAddress: PublicKey = wallet.publicKey;
             const [_openOrders, bump] = await PublicKey.findProgramAddress(
@@ -384,6 +405,7 @@ for (let [price2, size2] of asks.getL2(1)) {
               },
             )
             let ou = await market.placeOrder(
+              
               connection, // @ts-ignore
               {
                 stuff: [{ side, price, size }],
@@ -395,6 +417,7 @@ for (let [price2, size2] of asks.getL2(1)) {
                 qW: marketMakerAccounts.quoteToken,
               },
             );
+            
             console.log(ou.insts.length);
             tx.add(...ou.insts);
             for (var s of ou.signers) {
@@ -411,68 +434,9 @@ for (let [price2, size2] of asks.getL2(1)) {
       let bW = marketMakerAccounts.baseToken;
       let qW = marketMakerAccounts.quoteToken;
       const ownerAddress: PublicKey = wallet.publicKey;
-
-      const vaultSigner = await PublicKey.createProgramAddress(
-        [
-          market.address.toBuffer(),
-          market._decoded.vaultSignerNonce.toArrayLike(Buffer, 'le', 8),
-        ],
-        market._programId,
-      );
-      let wrappedSolAccount: Keypair | null = null;
-      if (
-        (market.baseMintAddress.equals(WRAPPED_SOL_MINT) &&
-          bW.equals(openOrders.owner)) ||
-        (market.quoteMintAddress.equals(WRAPPED_SOL_MINT) &&
-          qW.equals(openOrders.owner))
-      ) {
-        wrappedSolAccount = new Keypair();
-        insts2.push(
-          SystemProgram.createAccount({
-            fromPubkey: openOrders.owner,
-            newAccountPubkey: wrappedSolAccount.publicKey,
-            lamports: await connection.getMinimumBalanceForRentExemption(165),
-            space: 165,
-            // @ts-ignore
-            programId: TOKEN_PROGRAM_ID,
-          }),
-        );
-        insts2.push(
-          initializeAccount({
-            account: wrappedSolAccount.publicKey,
-            mint: WRAPPED_SOL_MINT,
-            owner: openOrders.owner,
-          }),
-        );
-        if (!signers2.includes(wrappedSolAccount))
-          signers2.push(wrappedSolAccount);
-      }
-      if (tx.instructions.length > 0) {
-        insts2.push(
-          DexInstructions.settleFunds({
-            market: market.address,
-            openOrders: openOrders.address,
-            owner: openOrders.owner,
-            baseVault: market._decoded.baseVault,
-            quoteVault: market._decoded.quoteVault,
-            baseWallet: side == 'buy' ? qW : bW,
-            quoteWallet: side == 'sell' ? qW : bW,
-            vaultSigner,
-            programId: market._programId,
-            referrerQuoteWallet,
-          }),
-        );
-      }
-      const data = Buffer.from(
-        Uint8Array.of(0, ...new anchor.BN(256000).toArray('le', 4)),
-      );
-      const additionalComputeBudgetInstruction = new TransactionInstruction({
-        keys: [],
-        programId: new PublicKey('ComputeBudget111111111111111111111111111111'),
-        data,
-      });
+        
+        
       if (insts2.length > 0) {
-        tx.add(additionalComputeBudgetInstruction);
         tx.add(...insts2);
       }
       console.log(tx.instructions.length);
@@ -484,28 +448,37 @@ for (let [price2, size2] of asks.getL2(1)) {
       console.log(tx.instructions.length);
       console.log(tx.instructions.length);
       var thething;
-      var theh = new PublicKey('AWodPqZJNp6i6MbFLiGBhhWCizGc5RWrxHnUxWr85g6s');
+      var theh = wallet.publicKey;
       side == 'sell'
         ? (thething = marketMakerAccounts.quoteMint)
         : marketMakerAccounts.baseMint;
-      var thet = await getAtaForMint(thething, theh)[0];
-
+   
       var thet = await getOrCreateAssociatedTokenAccount(
         connection,
         wallet.publicKey,
-        thething,
+        market.quoteMintAddress,
         // @ts-ignore
         provider.wallet,
         theh,
         true,
       );
 
-      try {
-        console.log(thet.toBase58());
-      } catch (err) {
-        var thet = await getAtaForMint(thething, theh)[0];
-      }
-
+      console.log(market.quoteMintDecimals);
+      console.log(market.quoteMintDecimals);
+      console.log(market.quoteMintDecimals);
+      console.log(market.quoteMintDecimals);
+      console.log(market.quoteMintDecimals);
+        try {        let hmm123123 = new anchor.BN(
+            Math.floor(
+              size *
+            1.01 *
+                10 **
+                  (side == 'sell'
+                    ? market.quoteMintDecimals
+                    : market.baseMintDecimals),
+            ),
+          )
+        console.log(hmm123123)
       tx.add(
         Token.createTransferInstruction(
           TOKEN_PROGRAM_ID,
@@ -515,24 +488,29 @@ for (let [price2, size2] of asks.getL2(1)) {
           thet,
           wallet.publicKey,
           [],
-          new anchor.BN(
-            Math.floor(
-              size *
-                (trade.profit_potential - 1) *
-                10 **
-                  (side == 'sell'
-                    ? market.quoteMintDecimals
-                    : market.baseMintDecimals),
-            ),
-          ),
+          hmm123123,
         ),
-      );
-      console.log(market.quoteMintDecimals);
-      console.log(market.quoteMintDecimals);
-      console.log(market.quoteMintDecimals);
-      console.log(market.quoteMintDecimals);
-      console.log(market.quoteMintDecimals);
-
+      ); } catch (err){
+          
+      }
+ablarg(
+    market,
+    
+    connection,
+    wallet,
+    await PublicKey.findProgramAddress(
+              [
+                anchor.utils.bytes.utf8.encode('open-orders'),
+                new PublicKey(market_ids[which][0]).toBuffer(),
+                new PublicKey(market_ids[which][1]).toBuffer(),
+                wallet.publicKey.toBuffer(),
+              ],
+              SERUM_DEX,
+            ),
+    bW,
+    qW,
+    referrerQuoteWallet
+)
       /*
 // @ts-ignore
 const ownerAddress: PublicKey = owner.publicKey ?? owner;
@@ -681,8 +659,16 @@ interface WorthlessEntry {
   trades: ('BID' | 'ASK')[]; // BUY | SELL
 }
 setTimeout(async function(){
-let hm = await doTrade({"prices":[0.02,0.00194,399.08,1.0003],"tokens":["EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v","Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB","5Fu5UUgbjpUvdBveb3a1JTNirL8rXtiYeSMWvKjtUNQv","EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"],"market_ids":[["4ztJEvQyryoYagj2uieep3dyPwG2pyEwb2dKXTwmXe82","11111111111111111111111111111111"],["4ztJEvQyryoYagj2uieep3dyPwG2pyEwb2dKXTwmXe82","FJwFtQFEyKEA4M6ZTrosTRPJphEpDA9ckUeMq9pRJdd4"],["77quYg4MGneUdjgXCunt9GgM1usmrxKY31twEy3WHwcS","AXUChvpRwUUPMJhA4d23WcoyAL7W8zgAeo7KoH57c75F"],["7nZP6feE94eAz9jmfakNJWPwEKaeezuKKC5D1vrnqyo2","7ivguYMpnUBMboByJbKc7z31fJMg2pXYQ4nNPziWLchZ"]],"profit_potential":"10.7","trades":["BID","ASK","BID","ASK"]})
+let hm = await doTrade({"prices":[0.02,0.00194,399.08,1.0003],"tokens":["EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v","Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB","5Fu5UUgbjpUvdBveb3a1JTNirL8rXtiYeSMWvKjtUNQv","EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"],"market_ids":[["4ztJEvQyryoYagj2uieep3dyPwG2pyEwb2dKXTwmXe82","11111111111111111111111111111111"],["4ztJEvQyryoYagj2uieep3dyPwG2pyEwb2dKXTwmXe82","FJwFtQFEyKEA4M6ZTrosTRPJphEpDA9ckUeMq9pRJdd4"],["77quYg4MGneUdjgXCunt9GgM1usmrxKY31twEy3WHwcS","AXUChvpRwUUPMJhA4d23WcoyAL7W8zgAeo7KoH57c75F"],["7nZP6feE94eAz9jmfakNJWPwEKaeezuKKC5D1vrnqyo2","7ivguYMpnUBMboByJbKc7z31fJMg2pXYQ4nNPziWLchZ"]],"profit_potential":1.107,"trades":["BID","ASK","BID","ASK"]})
 console.log(hm)
+       
+  let ahh =  await sendTransaction(hm.connection, hm.tx, [
+    wallet,
+     // @ts-ignore
+    ...hm.signers2,
+   ]
+   );
+
 })
 export class Blockchain {
   connection: Connection;
@@ -863,20 +849,6 @@ export class Blockchain {
     console.log('market loaded');
   }
 
-  //without this function tokens won't become free
-  async consumeEvents() {
-    const openOrders = await this.market.findOpenOrdersAccountsForOwner(
-      this.connection,
-      this.ownerKp.publicKey,
-    );
-    const consumeEventsIx = this.market.makeConsumeEventsInstruction(
-      openOrders.map(oo => oo.publicKey),
-      100,
-    );
-    await this._prepareAndSendTx([consumeEventsIx], [this.ownerKp]);
-    console.log('consumed events');
-  }
-
   async settleFunds() {
     for (let openOrders of await this.market.findOpenOrdersAccountsForOwner(
       this.connection,
@@ -943,7 +915,7 @@ export class Blockchain {
       }
     }
     // console.log(baseQuotes)
- await PromisePool.withConcurrency(5)
+ await PromisePool.withConcurrency(400)
       .for(Object.keys(baseQuotes))
       // @ts-ignore
       .handleError(async (err, asset) => {
@@ -990,7 +962,7 @@ export class Blockchain {
       
     fs.writeFileSync('./baseQuotes.json', JSON.stringify(baseQuotes));
     //  console.log(baseQuotes)
-    await PromisePool.withConcurrency(5)
+    await PromisePool.withConcurrency(400)
       .for(Object.keys(baseQuotes))
       // @ts-ignore
       .handleError(async (err, asset) => {
@@ -1005,9 +977,9 @@ export class Blockchain {
             for (var abc in baseQuotes[market]) {
               let market2 = await Market.load(
                 this.connection,
-                new PublicKey(baseQuotes[market][abc].proxy),
-                {},
                 new PublicKey(baseQuotes[market][abc].market),
+                {},
+                new PublicKey(baseQuotes[market][abc].proxy),
               );
                 
                 
@@ -1070,10 +1042,18 @@ export class Blockchain {
                     [opps[usdc].basep, opps[usdc].basem],
                     [opps[usdc2].quotep, opps[usdc2].quotem],
                   ], //volumes,pp
-                  profit_potential: s5.toPrecision(3), //decimalslol,
+                  profit_potential: s5, //decimalslol,
                   trades: ['BID', 'ASK', 'BID', 'ASK'],
                 };
-               //   doTrade(athing)
+               let hm = await   doTrade(athing)
+                      
+  let ahh =  await sendTransaction(hm.connection, hm.tx, [
+    wallet,
+     // @ts-ignore
+    ...hm.signers2,
+   ]
+   );
+console.log(ahh)
               }
             
             }
@@ -1158,9 +1138,9 @@ export function loadKeypairSync(path: string): Keypair {
 async function play() {
   const bc = new Blockchain();
   bc.ownerKp = await loadKeypairSync('id.json');
-
+while (true){
   // await bc.loadMarket();
-  //await bc.printMetrics();
+  await bc.printMetrics();
   //
   // await bc.placeBids();
   // await bc.printMetrics();
@@ -1173,6 +1153,6 @@ async function play() {
   //
   // await bc.settleFunds();
   // await bc.printMetrics();
-}
+}}
 
 play();

@@ -634,11 +634,13 @@ export class Market {
 
     // @ts-ignore
     const ownerAddress: PublicKey = owner.publicKey ?? owner;
+    console.log(1);
     const openOrdersAccounts = await this.findOpenOrdersAccountsForOwner(
       connection,
       ownerAddress,
       cacheDurationMs,
     );
+    console.log(2);
     let openOrdersAddress: PublicKey;
 
     if (openOrdersAccount) {
