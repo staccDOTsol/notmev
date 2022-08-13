@@ -68,7 +68,7 @@
   },
   "dependencies": {
     "@metaplex-foundation/mpl-token-metadata": "^2.2.3",
-    "@project-serum/serum": "0.13.63",
+    "@project-serum/serum": "^0.13.64",
     "@project-serum/swap": "^0.1.0-alpha.35",
     "@supercharge/promise-pool": "^2.3.2",
     "loglevel": "^1.8.0"

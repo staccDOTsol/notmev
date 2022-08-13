@@ -132,7 +132,7 @@ let pubkey = wallet.publicKey;
 
 //let connection = new web3.Connection("https://solana-api.projectserum.com")//https://rpc.theindex.io/mainnet-beta/4ae962ec-5c8c-4071-9ef2-e5c6b59bdf3e")/
 let connection = new web3.Connection(
-  'https://solana-api.projectserum.com',
+  'https://solana--mainnet.datahub.figment.io/apikey/fff8d9138bc9e233a2c1a5d4f777e6ad',
 );
 
 // @ts-ignore
@@ -142,7 +142,10 @@ const provider = new anchor.Provider(connection, walletWrapper, {
   skipPreflight: true,
 });
 
-import { Market } from '../packages/serum/src';
+import { Market as m2 } from '../packages/serum/src';
+import { Market } from '@project-serum/serum'
+
+
 import { DexInstructions } from '@project-serum/serum';
 import { getVaultOwnerAndNonce } from '@project-serum/swap/lib/utils';
 const PromisePool = require('@supercharge/promise-pool').default;
@@ -404,13 +407,21 @@ for (let [price2, size2] of asks.getL2(1)) {
                 qW: marketMakerAccounts.quoteToken,
               },
             )
-            let ou = await market.placeOrder(
+            let m123 =      await m2.load(
+              connection,
+              new PublicKey(market_ids[which][0]),
+              { skipPreflight: true, commitment: 'recent' },
+              new PublicKey(market_ids[which][1]),
+            );
+            let ou = await m123.placeOrder(
               
-              connection, // @ts-ignore
+              new Connection("https://solana-api.projectserum.com"), // @ts-ignore
               {
                 stuff: [{ side, price, size }],
+                // @ts-ignore
                 owner,
                 payer,
+                // @ts-ignore
                 orderType,
                 openOrdersAddressKey,
                 bW: marketMakerAccounts.baseToken,
@@ -659,15 +670,15 @@ interface WorthlessEntry {
   trades: ('BID' | 'ASK')[]; // BUY | SELL
 }
 setTimeout(async function(){
-let hm = await doTrade({"prices":[0.02,0.00194,399.08,1.0003],"tokens":["EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v","Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB","5Fu5UUgbjpUvdBveb3a1JTNirL8rXtiYeSMWvKjtUNQv","EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"],"market_ids":[["4ztJEvQyryoYagj2uieep3dyPwG2pyEwb2dKXTwmXe82","11111111111111111111111111111111"],["4ztJEvQyryoYagj2uieep3dyPwG2pyEwb2dKXTwmXe82","FJwFtQFEyKEA4M6ZTrosTRPJphEpDA9ckUeMq9pRJdd4"],["77quYg4MGneUdjgXCunt9GgM1usmrxKY31twEy3WHwcS","AXUChvpRwUUPMJhA4d23WcoyAL7W8zgAeo7KoH57c75F"],["7nZP6feE94eAz9jmfakNJWPwEKaeezuKKC5D1vrnqyo2","7ivguYMpnUBMboByJbKc7z31fJMg2pXYQ4nNPziWLchZ"]],"profit_potential":1.107,"trades":["BID","ASK","BID","ASK"]})
-console.log(hm)
+//let hm = await doTrade({"prices":[0.02,0.00194,399.08,1.0003],"tokens":["EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v","Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB","5Fu5UUgbjpUvdBveb3a1JTNirL8rXtiYeSMWvKjtUNQv","EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"],"market_ids":[["4ztJEvQyryoYagj2uieep3dyPwG2pyEwb2dKXTwmXe82","11111111111111111111111111111111"],["4ztJEvQyryoYagj2uieep3dyPwG2pyEwb2dKXTwmXe82","FJwFtQFEyKEA4M6ZTrosTRPJphEpDA9ckUeMq9pRJdd4"],["77quYg4MGneUdjgXCunt9GgM1usmrxKY31twEy3WHwcS","AXUChvpRwUUPMJhA4d23WcoyAL7W8zgAeo7KoH57c75F"],["7nZP6feE94eAz9jmfakNJWPwEKaeezuKKC5D1vrnqyo2","7ivguYMpnUBMboByJbKc7z31fJMg2pXYQ4nNPziWLchZ"]],"profit_potential":1.107,"trades":["BID","ASK","BID","ASK"]})
+//console.log(hm)
        
-  let ahh =  await sendTransaction(hm.connection, hm.tx, [
-    wallet,
+  //let ahh =  await sendTransaction(hm.connection, hm.tx, [
+ //   wallet,
      // @ts-ignore
-    ...hm.signers2,
-   ]
-   );
+ //   ...hm.signers2,
+ //  ]
+  // );
 
 })
 export class Blockchain {
@@ -882,7 +893,7 @@ export class Blockchain {
 
     this.connection = new Connection(
       'https://solana--mainnet.datahub.figment.io/apikey/fff8d9138bc9e233a2c1a5d4f777e6ad',
-      'recent',
+      'confirmed',
     );
     let ani = 0;
     let bb = 0;
@@ -895,7 +906,7 @@ export class Blockchain {
       }
       if (!Object.keys(baseQuotes).includes(m['quote'] + '/' + m['base'])) {
         baseQuotes[m['quote'] + '/' + m['base']] = [
-          { proxy: m.key1, market: m.key2 },
+          { proxy: m.key2, market: m.key1 },
         ];
         opps[m['quote'] + '/' + m['base']] = {
           quotep: '',
@@ -909,13 +920,13 @@ export class Blockchain {
         };
       } else {
         baseQuotes[m['quote'] + '/' + m['base']].push({
-          proxy: m.key1,
-          market: m.key2,
+          proxy: m.key2,
+          market: m.key1,
         });
       }
     }
-    // console.log(baseQuotes)
- await PromisePool.withConcurrency(400)
+     console.log(baseQuotes) /*
+ await PromisePool.withConcurrency(200)
       .for(Object.keys(baseQuotes))
       // @ts-ignore
       .handleError(async (err, asset) => {
@@ -927,11 +938,10 @@ export class Blockchain {
         try {           for (var abc in baseQuotes[market]){
               let market2 = await Market.load(
                 this.connection,
-                new PublicKey(baseQuotes[market][abc].proxy),
-                {},
                 new PublicKey(baseQuotes[market][abc].market),
+                {},
+                new PublicKey(baseQuotes[market][abc].proxy),
               );
-                
                 
               let bids = await market2.loadBids(this.connection);
               let asks = await market2.loadAsks(this.connection);
@@ -954,12 +964,13 @@ export class Blockchain {
                 }
               }
             }
+            
        }
       catch (err){
           console.log(err)
       }
- })
-      
+ }) */
+      console.log('1')
     fs.writeFileSync('./baseQuotes.json', JSON.stringify(baseQuotes));
     //  console.log(baseQuotes)
     await PromisePool.withConcurrency(400)
@@ -972,8 +983,7 @@ export class Blockchain {
       // @ts-ignore
       .process(async market => {
         try {
-           
-          for (var maybeusd of maybeusdcs) {
+           let maybeusd = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
             for (var abc in baseQuotes[market]) {
               let market2 = await Market.load(
                 this.connection,
@@ -1010,8 +1020,9 @@ export class Blockchain {
               let usdc2 = maybeusd + '/' + market.split('/')[1];
               let s4 = (opps[usdc2].bb / opps[usdc2].ba - 1) * 100;
               let s5 = s4 / s3;
+              console.log(s5)
+              if (s5 > 1 && s5 < 5000) {console.log(s5)
 
-              if (s5 > 0.4 && s5 < 5000) {
                 //console.log(s1 / s2)
                 console.log(
                   'arb opp usdc-coin-something-usdc ' +
@@ -1058,7 +1069,6 @@ console.log(ahh)
             
             }
             
-          }
         } catch (err) {
           console.log(err);
         }
