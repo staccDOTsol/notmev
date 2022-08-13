@@ -103,6 +103,24 @@ export class MarketProxyInstruction {
     this._middlewares.forEach((mw) => mw.newOrderV3(tradeIx));
     return this.proxy(tradeIx);
   }
+
+  public initOpenOrders(
+    owner: PublicKey,
+    market: PublicKey,
+    openOrders: PublicKey,
+    marketAuthority: PublicKey,
+  ): TransactionInstruction {
+    const ix = DexInstructions.initOpenOrders({
+      market,
+      openOrders,
+      owner,
+      programId: this._proxyProgramId,
+      marketAuthority,
+    });
+    this._middlewares.forEach((mw) => mw.initOpenOrders(ix));
+    return this.proxy(ix);
+  }
+
   public cancelOrder(owner: PublicKey, order: Order): TransactionInstruction {
     const ix = DexInstructions.cancelOrderV2({
       market: this._market.address,

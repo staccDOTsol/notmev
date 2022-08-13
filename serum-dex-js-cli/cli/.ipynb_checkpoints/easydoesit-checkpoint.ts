@@ -121,7 +121,7 @@ const provider = new anchor.Provider(connection, walletWrapper, {
   skipPreflight: true,
 });
 
-import { Market } from '../serum/src/market';
+import { Market } from '../packages/serum/src/market';
 import { DexInstructions } from '@project-serum/serum';
 import { getVaultOwnerAndNonce } from '@project-serum/swap/lib/utils';
 const PromisePool = require('@supercharge/promise-pool').default;

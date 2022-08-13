@@ -122,12 +122,18 @@ export class MarketProxyInstruction {
   }
 
   public cancelOrder(owner: PublicKey, order: Order): TransactionInstruction {
-    const ix = this._market.makeCancelOrderInstruction(
-      // @ts-ignore
-      null, // Not used by the function.
+    const ix = DexInstructions.cancelOrderV2({
+      market: this._market.address,
       owner,
-      order,
-    );
+      openOrders: order.openOrdersAddress,
+      bids: this._market.decoded.bids,
+      asks: this._market.decoded.asks,
+      eventQueue: this._market.decoded.eventQueue,
+      side: order.side,
+      orderId: order.orderId,
+      openOrdersSlot: order.openOrdersSlot,
+      programId: this._proxyProgramId,
+    });
     this._middlewares.forEach((mw) => mw.cancelOrderV2(ix));
     return this.proxy(ix);
   }
@@ -216,6 +222,39 @@ export class MarketProxyInstruction {
       limit,
     });
     this._middlewares.forEach((mw) => mw.prune(ix));
+    return this.proxy(ix);
+  }
+
+  public consumeEvents(
+    openOrdersAccounts: Array<PublicKey>,
+    limit: number,
+  ): TransactionInstruction {
+    const ix = DexInstructions.consumeEvents({
+      market: this._market.address,
+      eventQueue: this._market.decoded.eventQueue,
+      coinFee: this._market.decoded.eventQueue,
+      pcFee: this._market.decoded.eventQueue,
+      openOrdersAccounts,
+      limit,
+      programId: this._proxyProgramId,
+    });
+    this._middlewares.forEach((mw) => mw.consumeEvents(ix));
+    return this.proxy(ix);
+  }
+
+  public consumeEventsPermissioned(
+    openOrdersAccounts: Array<PublicKey>,
+    limit: number,
+  ): TransactionInstruction {
+    const ix = DexInstructions.consumeEventsPermissioned({
+      market: this._market.address,
+      eventQueue: this._market.decoded.eventQueue,
+      crankAuthority: this._market.decoded.consumeEventsAuthority,
+      openOrdersAccounts,
+      limit,
+      programId: this._proxyProgramId,
+    });
+    this._middlewares.forEach((mw) => mw.consumeEventsPermissioned(ix));
     return this.proxy(ix);
   }
 

@@ -8,6 +8,7 @@ export {
 export {
   DexInstructions,
   decodeInstruction,
+  decodeInstructionV2,
   SETTLE_FUNDS_BASE_WALLET_INDEX,
   SETTLE_FUNDS_QUOTE_WALLET_INDEX,
   NEW_ORDER_OPEN_ORDERS_INDEX,
@@ -29,6 +30,7 @@ export { MarketProxy, MarketProxyBuilder } from './market-proxy';
 export {
   OpenOrdersPda,
   ReferralFees,
+  PermissionedCrank,
   Logger,
   Middleware,
 } from './market-proxy/middleware';

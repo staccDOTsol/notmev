@@ -46,8 +46,8 @@ export type TokenInstructionLayout =
   | { mintToChecked: { amount: BN; decimals: number } }
   | { burnChecked: { amount: BN; decimals: number } };
 
-export const TokenInstructionLayout: EnumLayout<TokenInstructionLayout> = rustEnum(
-  [
+export const TokenInstructionLayout: EnumLayout<TokenInstructionLayout> =
+  rustEnum([
     struct(
       [
         u8('decimals'),
@@ -74,16 +74,14 @@ export const TokenInstructionLayout: EnumLayout<TokenInstructionLayout> = rustEn
     struct([u64('amount'), u8('decimals')], 'approveChecked'),
     struct([u64('amount'), u8('decimals')], 'mintToChecked'),
     struct([u64('amount'), u8('decimals')], 'burnChecked'),
-  ],
-);
+  ]);
 
 const instructionMaxSpan = Math.max(
   ...Object.values(TokenInstructionLayout.registry).map(r => r.span),
 );
 
 function encodeTokenInstructionData(instruction: TokenInstructionLayout) {
-  //todo disguisting fucking hack of adding +1000 to solve "RangeError": encoding overruns Buffer
-  const b = Buffer.alloc(instructionMaxSpan + 1000);
+  const b = Buffer.alloc(instructionMaxSpan);
   const span = TokenInstructionLayout.encode(instruction, b);
   return b.slice(0, span);
 }

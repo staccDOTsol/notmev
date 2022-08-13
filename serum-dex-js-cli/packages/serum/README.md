@@ -10,13 +10,13 @@ JavaScript client library for interacting with the Project Serum DEX.
 Using npm:
 
 ```
-npm install ../../web3.js @project-serum/serum
+npm install @solana/web3.js @project-serum/serum
 ```
 
 Using yarn:
 
 ```
-yarn add ../../web3.js @project-serum/serum
+yarn add @solana/web3.js @project-serum/serum
 ```
 
 ## Usage
@@ -56,7 +56,7 @@ await market.placeOrder(connection, {
   side: 'buy', // 'buy' or 'sell'
   price: 123.45,
   size: 17.0,
-  orderType: 'ioc', // 'ioc', 'ioc', 'postOnly'
+  orderType: 'limit', // 'limit', 'ioc', 'postOnly'
 });
 
 // Retrieving open orders by owner
