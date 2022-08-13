@@ -1,9 +1,9 @@
 #!/bin/bash
 bla=${1}
+oldbla=${1}
 
-
-while [ $bla -gt $((bla-5000000)) ]
-
+while [ $bla -gt $((oldbla-5000000)) ]
+                         
 do
 echo $bla
 nohup bash untitled.sh $bla &

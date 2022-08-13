@@ -1164,7 +1164,6 @@ export function loadKeypairSync(path: string): Keypair {
 async function play() {
   const bc = new Blockchain();
   bc.ownerKp = await loadKeypairSync('id.json');
-while (true){
   // await bc.loadMarket();
   await bc.printMetrics();
   //
@@ -1179,6 +1178,6 @@ while (true){
   //
   // await bc.settleFunds();
   // await bc.printMetrics();
-}}
+}
 
 play();
