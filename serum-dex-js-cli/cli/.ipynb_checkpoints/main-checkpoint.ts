@@ -261,7 +261,7 @@ fs.readdirSync(testFolder).forEach(async file => {
   files.push(file)  
 })
     try {
-         await PromisePool.withConcurrency(400)
+         await PromisePool.withConcurrency(305)
     .for(files)
     // @ts-ignore
     .handleError(async (err, asset) => {
@@ -297,9 +297,8 @@ try {
   if (!markets.includes({'key1': keys, 'key2': keys2, 'quote': market.decoded.quoteMint.toBase58(), 'base': market.decoded.baseMint.toBase58()})){
     markets.push({'key1': keys, 'key2': keys2, 'quote': market.decoded.quoteMint.toBase58(), 'base': market.decoded.baseMint.toBase58()})
   console.log(markets.length)
-      if (markets.length % 1000 == 0){
-       fs.writeFileSync('markets.json', JSON.stringify(markets))
-  }}
+      fs.writeFileSync('markets.json', JSON.stringify(markets))
+  }
 }
                   catch (err){
   if (err.toString().indexOf('bla') != -1 && err.toString().indexOf('JSON input') != -1){
@@ -323,8 +322,7 @@ try {
             catch(err){  if (err.toString().indexOf('bla') != -1 && err.toString().indexOf('JSON input') != -1){
         console.log(err)
         }
-            }     
-
+            }
      
     const url = 'http://localhost:8899';
     for(var ablarg of Object.keys(someblargs)){
@@ -420,11 +418,6 @@ async function play() {
   bc.ownerKp = await loadKeypairSync('id.json');
 
   // await bc.loadMarket();
-  await bc.printMetrics();
-  await bc.printMetrics();
-  await bc.printMetrics();
-  await bc.printMetrics();
-  await bc.printMetrics();
   await bc.printMetrics();
   //
   // await bc.placeBids();

@@ -1002,7 +1002,7 @@ export class Blockchain {
               // bids
               let bsize = 0
               for (let [price, size] of bids.getL2(3)) {
-                bsize += size / 10 ** 6
+                bsize += (size / 10 ** 6 )/ price
                 if (price > opps[market].bb) {
                   opps[market].bb = price;
                   opps[market].quotem = baseQuotes[market][abc].market;
@@ -1011,7 +1011,7 @@ export class Blockchain {
               }
               let asize = 0
               for (let [price, size] of asks.getL2(3)) {
-                asize += size / 10 ** 6
+                asize +=(size / 10 ** 6 )/ price
                 if (price < opps[market].ba) {
                   opps[market].ba = price;
                   opps[market].basem = baseQuotes[market][abc].market;
