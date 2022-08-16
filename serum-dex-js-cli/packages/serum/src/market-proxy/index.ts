@@ -1,5 +1,3 @@
-// @ts-nocheck
-
 import BN from 'bn.js';
 import { Connection, PublicKey, TransactionInstruction } from '@solana/web3.js';
 import { utils } from '@project-serum/anchor';

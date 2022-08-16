@@ -1,4 +1,3 @@
-// @ts-nocheck
 import * as BufferLayout from 'buffer-layout';
 import {
   PublicKey,

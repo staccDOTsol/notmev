@@ -1,6 +1,4 @@
-// @ts-nocheck
-
-import { struct, u16, u32, u8, union, seq } from 'buffer-layout';
+import { struct, u16, u32, u8, union } from 'buffer-layout';
 import {
   orderTypeLayout,
   publicKeyLayout,
@@ -57,8 +55,8 @@ INSTRUCTION_LAYOUT.inner.addVariant(
   ]),
   'newOrder',
 );
-INSTRUCTION_LAYOUT.inner.addVariant(2, struct([u16('limit')]), 'matchOrders');
-INSTRUCTION_LAYOUT.inner.addVariant(3, struct([u16('limit')]), 'consumeEvents');
+INSTRUCTION_LAYOUT.inner.addVariant(2, struct([u16('ioc')]), 'matchOrders');
+INSTRUCTION_LAYOUT.inner.addVariant(3, struct([u16('ioc')]), 'consumeEvents');
 INSTRUCTION_LAYOUT.inner.addVariant(
   4,
   struct([
@@ -85,7 +83,7 @@ INSTRUCTION_LAYOUT.inner.addVariant(
     selfTradeBehaviorLayout('selfTradeBehavior'),
     orderTypeLayout('orderType'),
     u64('clientId'),
-    u16('limit'),
+    u16('ioc'),
   ]),
   'newOrderV3',
 );
@@ -101,19 +99,29 @@ INSTRUCTION_LAYOUT.inner.addVariant(
 );
 INSTRUCTION_LAYOUT.inner.addVariant(14, struct([]), 'closeOpenOrders');
 INSTRUCTION_LAYOUT.inner.addVariant(15, struct([]), 'initOpenOrders');
-INSTRUCTION_LAYOUT.inner.addVariant(16, struct([u16('limit')]), 'prune');
-INSTRUCTION_LAYOUT.inner.addVariant(
-  17,
-  struct([u16('limit')]),
-  'consumeEventsPermissioned',
-);
+INSTRUCTION_LAYOUT.inner.addVariant(16, struct([u16('ioc')]), 'prune');
+INSTRUCTION_LAYOUT.inner.addVariant(17, struct([u16('ioc')]), 'consumeEventsPermissioned');
 INSTRUCTION_LAYOUT.inner.addVariant(
   18,
-  struct([seq(u64(), 8, 'clientIds')]),
+  struct([
+    u64('clientId0'),
+    u64('clientId1'),
+    u64('clientId2'),
+    u64('clientId3'),
+    u64('clientId4'),
+    u64('clientId5'),
+    u64('clientId6'),
+    u64('clientId7')
+  ]),
   'cancelOrdersByClientIds',
 );
 
-const orderStruct = () =>
+export const INSTRUCTION_LAYOUT_V2 = new VersionedLayout(
+  0,
+  union(u32('instruction')),
+);
+INSTRUCTION_LAYOUT_V2.inner.addVariant(
+  10,
   struct([
     sideLayout('side'),
     u64('limitPrice'),
@@ -122,29 +130,14 @@ const orderStruct = () =>
     selfTradeBehaviorLayout('selfTradeBehavior'),
     orderTypeLayout('orderType'),
     u64('clientId'),
-    u16('limit'),
+    u16('ioc'),
     i64('maxTs'),
-  ]);
-
-INSTRUCTION_LAYOUT.inner.addVariant(
-  19,
-  orderStruct(),
-  'replaceOrderByClientId',
-);
-INSTRUCTION_LAYOUT.inner.addVariant(
-  20,
-  struct([u64('orderAmount'), seq(orderStruct(), 8, 'orders')]),
-  'replaceOrdersByClientIds',
+  ]),
+  'newOrderV3',
 );
 
-export const INSTRUCTION_LAYOUT_V2 = new VersionedLayout(
-  0,
-  union(u32('instruction')),
-);
-INSTRUCTION_LAYOUT_V2.inner.addVariant(10, orderStruct(), 'newOrderV3');
-
-export function encodeInstruction(instruction, maxLength = 100) {
-  const b = Buffer.alloc(maxLength);
+export function encodeInstruction(instruction) {
+  const b = Buffer.alloc(100);
   return b.slice(0, INSTRUCTION_LAYOUT.encode(instruction, b));
 }
 
@@ -297,7 +290,6 @@ export class DexInstructions {
     selfTradeBehavior,
     feeDiscountPubkey = null,
     maxTs = null,
-    replaceIfExists = false,
   }) {
     const keys = [
       { pubkey: market, isSigner: false, isWritable: true },
@@ -321,20 +313,12 @@ export class DexInstructions {
       });
     }
 
-    let instructionName, encoder;
-    if (replaceIfExists) {
-      instructionName = 'replaceOrderByClientId';
-      encoder = encodeInstruction;
-    } else {
-      instructionName = 'newOrderV3';
-      encoder = maxTs ? encodeInstructionV2 : encodeInstruction;
-    }
-
+    const encoder = maxTs ? encodeInstructionV2 : encodeInstruction;
     return new TransactionInstruction({
       keys,
       programId,
       data: encoder({
-        [instructionName]: {
+        newOrderV3: {
           side,
           limitPrice,
           maxBaseQuantity,
@@ -346,62 +330,6 @@ export class DexInstructions {
           maxTs: new BN(maxTs ?? '9223372036854775807'),
         },
       }),
-    });
-  }
-
-  static replaceOrdersByClientIds({
-    market,
-    openOrders,
-    payer,
-    owner,
-    requestQueue,
-    eventQueue,
-    bids,
-    asks,
-    baseVault,
-    quoteVault,
-    feeDiscountPubkey = null,
-    programId,
-    orders,
-  }) {
-    const keys = [
-      { pubkey: market, isSigner: false, isWritable: true },
-      { pubkey: openOrders, isSigner: false, isWritable: true },
-      { pubkey: requestQueue, isSigner: false, isWritable: true },
-      { pubkey: eventQueue, isSigner: false, isWritable: true },
-      { pubkey: bids, isSigner: false, isWritable: true },
-      { pubkey: asks, isSigner: false, isWritable: true },
-      { pubkey: payer, isSigner: false, isWritable: true },
-      { pubkey: owner, isSigner: true, isWritable: false },
-      { pubkey: baseVault, isSigner: false, isWritable: true },
-      { pubkey: quoteVault, isSigner: false, isWritable: true },
-      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-      { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
-    ];
-    if (feeDiscountPubkey) {
-      keys.push({
-        pubkey: feeDiscountPubkey,
-        isSigner: false,
-        isWritable: false,
-      });
-    }
-
-    return new TransactionInstruction({
-      keys,
-      programId,
-      data: encodeInstruction(
-        {
-          replaceOrdersByClientIds: {
-            orderAmount: new BN(orders.length),
-            orders: orders.map((order) => ({
-              ...order,
-              maxTs: new BN(order.maxTs ?? '9223372036854775807'),
-              limit: 65535,
-            })),
-          },
-        },
-        15 + orders.length * 60,
-      ).slice(0, 13 + orders.length * 54),
     });
   }
 
@@ -592,7 +520,7 @@ export class DexInstructions {
     programId,
   }) {
     if (clientIds.length > 8) {
-      throw new Error('Number of client ids cannot exceed 8!');
+      throw new Error("Number of client ids cannot exceed 8!");
     }
 
     while (clientIds.length < 8) {
@@ -610,7 +538,7 @@ export class DexInstructions {
       ],
       programId,
       data: encodeInstruction({
-        cancelOrdersByClientIds: { clientIds },
+        cancelOrdersByClientIds: Object.fromEntries(clientIds.map((clientId, i) => [`clientId${i}`, clientId])),
       }),
     });
   }
