@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 import { blob, seq, struct, u8 } from 'buffer-layout';
 import { accountFlagsLayout, publicKeyLayout, u128, u64 } from './layout';
 import { Slab, SLAB_LAYOUT } from './slab';

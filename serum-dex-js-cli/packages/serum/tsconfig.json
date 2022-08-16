@@ -1,5 +1,10 @@
 {
   "extends": "@tsconfig/node12/tsconfig.json",
+
+        "target": "esnext",
+        "module": "CommonJS",
+        "moduleResolution": "node",
+        "esModuleInterop": true,
   "compilerOptions": {
     "outDir": "./lib",
     "allowJs": true,

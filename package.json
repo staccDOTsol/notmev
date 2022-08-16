@@ -53,6 +53,8 @@
     "cli-progress": "^3.10.0",
     "commander": "^9.0.0",
     "form-data": "^4.0.0",
+    "husky": "^8.0.1",
+    "husky-run": "^0.0.0",
     "ipfs-http-client": "^52.0.3",
     "jsonschema": "^1.4.0",
     "lodash": "^4.17.21",

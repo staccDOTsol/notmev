@@ -12,7 +12,6 @@ import * as bs58 from 'bs58';
 import fs from 'fs';
 
 import { Token } from '@solana/spl-token';
-import { OpenOrders } from '@project-serum/serum';
 import * as borsh from 'borsh';
 import { getOrCreateAssociatedTokenAccount } from './getorcreate';
 import * as web3 from '@solana/web3.js';
@@ -144,12 +143,10 @@ const provider = new anchor.Provider(connection, walletWrapper, {
   skipPreflight: true,
 });
 
-import { Market as m2 } from '../packages/serum/src';
+import { Market as m2 } from '../packages/serum/lib/market';
 import { Market } from '@project-serum/serum'
 
 
-import { DexInstructions } from '@project-serum/serum';
-import { getVaultOwnerAndNonce } from '@project-serum/swap/lib/utils';
 const PromisePool = require('@supercharge/promise-pool').default;
 
 function sleep(ms: number): Promise<void> {
@@ -741,7 +738,7 @@ export class Blockchain {
     const fs = require('fs');
 
     this.connection = new Connection(
-      'https://solana--mainnet.datahub.figment.io/apikey/fff8d9138bc9e233a2c1a5d4f777e6ad',
+      'https://api.devnet.solana.com',
       'confirmed',
     );
     let ani = 0;
@@ -774,7 +771,7 @@ export class Blockchain {
         });
       }
     }
-    let liqsample = fs.readFileSync('../liqsample.json')
+    let liqsample = JSON.parse(fs.readFileSync('./liqsample.json').toString())
     const authorityPubkey = wallet.publicKey
     const payerPubkey = wallet.publicKey
     let recentSlot = (await connection.getLatestBlockhash()).lastValidBlockHeight
@@ -790,9 +787,9 @@ export class Blockchain {
       payer: payerPubkey,
       recentSlot,
     };
-    for (var abc of liqsample){
-      if (abc.liqtopbbos > 300){
-        console.log(1)
+    for (var abc in liqsample){
+      if (liqsample[abc].liqtopbbos > 300){
+        markets.push(liqsample[abc])
       }
     }
    let abc2 = await provider.send(transaction, [wallet])
